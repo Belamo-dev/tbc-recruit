@@ -40,6 +40,7 @@ app.add_middleware(
 allowed_realms_env = os.getenv("ALLOWED_REALMS", "Spineshatter,Thunderstrike")
 ALLOWED_REALMS: Set[str] = {r.strip() for r in allowed_realms_env.split(",") if r.strip()}
 
+
 def validate_realm(realm: str):
     if realm not in ALLOWED_REALMS:
         raise HTTPException(
@@ -47,9 +48,11 @@ def validate_realm(realm: str):
             detail=f"Realm not allowed. Allowed: {', '.join(sorted(ALLOWED_REALMS))}"
         )
 
+
 # Mini rate limit
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "30"))
 _rl_bucket: Dict[str, List[datetime]] = {}
+
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
@@ -65,9 +68,11 @@ async def rate_limit_middleware(request: Request, call_next):
         _rl_bucket[ip] = arr
     return await call_next(request)
 
+
 def require_token(entity_token: str, provided: Optional[str]):
     if not provided or provided != entity_token:
         raise HTTPException(status_code=401, detail="Invalid or missing edit token")
+
 
 def guild_to_out(g: Guild) -> GuildOut:
     return GuildOut(
@@ -88,6 +93,7 @@ def guild_to_out(g: Guild) -> GuildOut:
         description=g.description,
     )
 
+
 def player_to_out(p: Player) -> PlayerOut:
     return PlayerOut(
         id=p.id,
@@ -106,9 +112,11 @@ def player_to_out(p: Player) -> PlayerOut:
         note=p.note,
     )
 
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "allowed_realms": sorted(ALLOWED_REALMS)}
+
 
 # Guilds
 @app.post("/api/guilds", response_model=GuildCreated)
@@ -142,6 +150,7 @@ def create_guild(payload: GuildCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Guild already exists or invalid data")
     db.refresh(g)
     return {"guild": guild_to_out(g), "edit_token": token}
+
 
 @app.get("/api/guilds", response_model=List[GuildOut])
 def list_guilds(
@@ -183,12 +192,14 @@ def list_guilds(
         out.append(guild_to_out(g))
     return out
 
+
 @app.get("/api/guilds/{guild_id}", response_model=GuildOut)
 def get_guild(guild_id: int, db: Session = Depends(get_db)):
     g = db.get(Guild, guild_id)
     if not g or g.realm not in ALLOWED_REALMS:
         raise HTTPException(404, "Guild not found")
     return guild_to_out(g)
+
 
 @app.put("/api/guilds/{guild_id}", response_model=GuildOut)
 def update_guild(
@@ -224,6 +235,7 @@ def update_guild(
     db.refresh(g)
     return guild_to_out(g)
 
+
 @app.delete("/api/guilds/{guild_id}")
 def delete_guild(
     guild_id: int,
@@ -237,6 +249,7 @@ def delete_guild(
     db.delete(g)
     db.commit()
     return {"deleted": True}
+
 
 # Players
 @app.post("/api/players", response_model=PlayerCreated)
@@ -269,6 +282,7 @@ def create_player(payload: PlayerCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Player already exists or invalid data")
     db.refresh(p)
     return {"player": player_to_out(p), "edit_token": token}
+
 
 @app.get("/api/players", response_model=List[PlayerOut])
 def list_players(
@@ -310,12 +324,14 @@ def list_players(
     rows = db.execute(stmt).scalars().all()
     return [player_to_out(p) for p in rows]
 
+
 @app.get("/api/players/{player_id}", response_model=PlayerOut)
 def get_player(player_id: int, db: Session = Depends(get_db)):
     p = db.get(Player, player_id)
     if not p or p.realm not in ALLOWED_REALMS:
         raise HTTPException(404, "Player not found")
     return player_to_out(p)
+
 
 @app.put("/api/players/{player_id}", response_model=PlayerOut)
 def update_player(
@@ -350,6 +366,7 @@ def update_player(
     db.refresh(p)
     return player_to_out(p)
 
+
 @app.delete("/api/players/{player_id}")
 def delete_player(
     player_id: int,
@@ -363,6 +380,7 @@ def delete_player(
     db.delete(p)
     db.commit()
     return {"deleted": True}
+
 
 # Applications
 @app.post("/api/applications", response_model=ApplicationOut)
@@ -398,6 +416,7 @@ def apply(payload: ApplicationCreate, db: Session = Depends(get_db)):
         created_at=a.created_at.isoformat(),
     )
 
+
 @app.get("/api/guilds/{guild_id}/applications", response_model=List[ApplicationOut])
 def guild_apps(
     guild_id: int,
@@ -426,8 +445,13 @@ def guild_apps(
         for a in rows
     ]
 
+
 @app.post("/api/import")
 def import_character(req: ImportRequest, db: Session = Depends(get_db)):
+    """
+    Speichert den Addon-Export in character_imports UND spiegelt einen Eintrag in players,
+    damit er im Tab "Spieler suchen" auftaucht.
+    """
     try:
         payload = decode_export_string(req.exportString)
         summary = summarize_payload(payload)
@@ -439,6 +463,7 @@ def import_character(req: ImportRequest, db: Session = Depends(get_db)):
 
         validate_realm(realm)
 
+        # Export-Zeit parsen (optional)
         exported_at = None
         exported_at_raw = summary.get("exportedAt")
         if exported_at_raw:
@@ -449,6 +474,37 @@ def import_character(req: ImportRequest, db: Session = Depends(get_db)):
 
         guid = (summary.get("guid") or "").strip() or None
 
+        # 1) Spiegeln in players (upsert)
+        player_insert_vals = {
+            "edit_token": secrets.token_urlsafe(24),
+            "name": name,
+            "realm": realm,
+            "faction": summary.get("faction") or "Horde",
+            "language": summary.get("language") or "DE",
+            "class_name": summary.get("className") or summary.get("classFile") or "Warrior",
+            "spec": summary.get("spec") or "Unknown",
+            "role": summary.get("role") or "DPS",
+            "skill_rating": int(summary.get("skillRating") or 3),
+            "professions": summary.get("professions") or [],
+            "attunements": summary.get("attunements") or [],
+            "availability": summary.get("availability") or [],
+            "logs_url": summary.get("logsUrl") or "",
+            "note": summary.get("note") or "Imported via Addon",
+            "updated_at": func.now(),
+        }
+
+        # edit_token NICHT überschreiben bei Update
+        player_update_vals = dict(player_insert_vals)
+        player_update_vals.pop("edit_token", None)
+
+        pstmt = insert(Player).values(**player_insert_vals)
+        pstmt = pstmt.on_conflict_do_update(
+            index_elements=[Player.name, Player.realm],
+            set_=player_update_vals,
+        )
+        db.execute(pstmt)
+
+        # 2) Speichern in character_imports (upsert)
         values = {
             "guid": guid,
             "name": name,
@@ -479,7 +535,11 @@ def import_character(req: ImportRequest, db: Session = Depends(get_db)):
         new_id = db.execute(stmt).scalar()
         db.commit()
 
-        return {"ok": True, "id": int(new_id) if new_id is not None else None, "summary": ImportSummary(**summary)}
+        return {
+            "ok": True,
+            "id": int(new_id) if new_id is not None else None,
+            "summary": ImportSummary(**summary),
+        }
 
     except HTTPException:
         db.rollback()
