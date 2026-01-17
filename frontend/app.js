@@ -1,5 +1,5 @@
 // HIER TRAGST DU DEINE RAILWAY API URL EIN, zB: https://xyz.up.railway.app
-const API_BASE = "https://YOUR_RAILWAY_URL";
+const API_BASE = "https://tbc-recruit.onrender.com";
 
 const CLASSES = {
   "Warrior": ["Arms", "Fury", "Protection"],
