@@ -1,4 +1,4 @@
-// HIER TRAGST DU DEINE RAILWAY API URL EIN, zB: https://xyz.up.railway.app
+// HIER TRAGST DU DEINE API URL EIN, zB: https://tbc-recruit.onrender.com
 const API_BASE = "https://tbc-recruit.onrender.com";
 
 const CLASSES = {
@@ -102,6 +102,59 @@ async function apiPost(path, body) {
   if (!res.ok) throw new Error(await res.text());
   return await res.json();
 }
+
+/* ---------------- Addon Import ---------------- */
+async function apiImportAddon(exportString) {
+  const res = await fetch(API_BASE + "/api/import", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ exportString }),
+  });
+
+  // Backend liefert bei Fehler JSON mit {"detail": "..."} oder Text
+  let data = null;
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  if (ct.includes("application/json")) {
+    data = await res.json();
+  } else {
+    const t = await res.text();
+    data = { detail: t };
+  }
+
+  if (!res.ok) throw new Error(data.detail || "Import fehlgeschlagen");
+  return data;
+}
+
+function setupAddonImport() {
+  const btn = qs("wpeImportBtn");
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    const exportString = (qs("wpeImport")?.value || "").trim();
+    const statusEl = qs("wpeImportStatus");
+    const outEl = qs("wpeImportOut");
+
+    if (statusEl) statusEl.textContent = "";
+    if (outEl) outEl.textContent = "";
+
+    if (!exportString) {
+      if (statusEl) statusEl.textContent = "Bitte Export-String einfuegen.";
+      return;
+    }
+
+    if (statusEl) statusEl.textContent = "Import laeuft...";
+
+    try {
+      const data = await apiImportAddon(exportString);
+      if (statusEl) statusEl.textContent = "OK";
+      if (outEl) outEl.textContent = JSON.stringify(data, null, 2);
+    } catch (e) {
+      if (statusEl) statusEl.textContent = "Fehler";
+      if (outEl) outEl.textContent = String(e.message || e);
+    }
+  });
+}
+/* ------------------------------------------------ */
 
 function renderGuild(g) {
   const d = el("div", "result");
@@ -391,3 +444,4 @@ function setupActions() {
 setupTabs();
 setupUI();
 setupActions();
+setupAddonImport();
