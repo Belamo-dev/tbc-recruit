@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: tbc_recruit
+      POSTGRES_USER: tbc
+      POSTGRES_PASSWORD: tbc
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TBC Recruit</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>TBC Recruit</h1>
+      <p>Gilden finden, Spieler finden, Bewerben. TBC Classic.</p>
+      <div class="hint" id="apiHint"></div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="guilds">Gilden suchen</button>
+      <button class="tab" data-tab="players">Spieler suchen</button>
+      <button class="tab" data-tab="newGuild">Gilde eintragen</button>
+      <button class="tab" data-tab="newPlayer">Spielerprofil anlegen</button>
+    </nav>
+
+    <main>
+      <section id="guilds" class="panel active">
+        <h2>Gilden suchen</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Filter</h3>
+            <div class="grid2">
+              <input id="gRealm" placeholder="Realm" />
+              <select id="gFaction">
+                <option value="">Fraktion egal</option>
+                <option>Alliance</option>
+                <option>Horde</option>
+              </select>
+              <select id="gLang">
+                <option value="">Sprache egal</option>
+                <option>DE</option>
+                <option>EN</option>
+              </select>
+              <input id="gQuery" placeholder="Name enthaelt..." />
+              <select id="gNeedClass"></select>
+              <select id="gNeedRole">
+                <option value="">Rolle egal</option>
+                <option>DPS</option>
+                <option>Tank</option>
+                <option>Heal</option>
+              </select>
+            </div>
+            <button id="loadGuilds">Suchen</button>
+          </div>
+
+          <div class="card">
+            <h3>Ergebnisse</h3>
+            <div id="guildResults" class="results"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="players" class="panel">
+        <h2>Spieler suchen</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Filter</h3>
+            <div class="grid2">
+              <input id="pRealm" placeholder="Realm" />
+              <select id="pFaction">
+                <option value="">Fraktion egal</option>
+                <option>Alliance</option>
+                <option>Horde</option>
+              </select>
+              <select id="pLang">
+                <option value="">Sprache egal</option>
+                <option>DE</option>
+                <option>EN</option>
+              </select>
+              <input id="pQuery" placeholder="Charname enthaelt..." />
+              <select id="pClass"></select>
+              <select id="pSpec"></select>
+              <select id="pRole">
+                <option value="">Rolle egal</option>
+                <option>DPS</option>
+                <option>Tank</option>
+                <option>Heal</option>
+              </select>
+              <select id="pMinSkill">
+                <option value="">Min Skill egal</option>
+                <option value="1">1+</option>
+                <option value="2">2+</option>
+                <option value="3">3+</option>
+                <option value="4">4+</option>
+                <option value="5">5</option>
+              </select>
+            </div>
+            <button id="loadPlayers">Suchen</button>
+          </div>
+
+          <div class="card">
+            <h3>Ergebnisse</h3>
+            <div id="playerResults" class="results"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="newGuild" class="panel">
+        <h2>Gilde eintragen</h2>
+        <div class="card">
+          <div class="grid2">
+            <input id="ngName" placeholder="Guildname" />
+            <input id="ngRealm" placeholder="Realm" />
+            <select id="ngFaction">
+              <option>Horde</option>
+              <option>Alliance</option>
+            </select>
+            <select id="ngLang">
+              <option>DE</option>
+              <option>EN</option>
+            </select>
+
+            <div class="span2">
+              <label>Raidtage</label>
+              <div class="chips" id="ngDays"></div>
+            </div>
+
+            <input id="ngStart" placeholder="Raid Start (zB 20:00)" value="20:00" />
+            <input id="ngEnd" placeholder="Raid Ende (zB 23:00)" value="23:00" />
+
+            <input id="ngLoot" placeholder="Lootsystem" value="Loot Council" />
+            <input id="ngContact" placeholder="Kontakt Charname" />
+
+            <input id="ngDiscord" placeholder="Discord Link" />
+            <input id="ngWebsite" placeholder="Website Link" />
+
+            <div class="span2">
+              <label>Progress (frei, zB SSC 4/6, TK 3/4)</label>
+              <textarea id="ngProgress" rows="2" placeholder="SSC=4/6;TK=3/4;Hyjal=0/5;BT=0/9"></textarea>
+            </div>
+
+            <div class="span2">
+              <label>Recruitment Needs</label>
+              <div class="row">
+                <select id="ngNeedClass"></select>
+                <select id="ngNeedSpec"></select>
+                <select id="ngNeedRole">
+                  <option>DPS</option>
+                  <option>Tank</option>
+                  <option>Heal</option>
+                </select>
+                <select id="ngNeedPrio">
+                  <option value="5">Prio 5</option>
+                  <option value="4">Prio 4</option>
+                  <option value="3" selected>Prio 3</option>
+                  <option value="2">Prio 2</option>
+                  <option value="1">Prio 1</option>
+                </select>
+                <button id="ngAddNeed" type="button">Hinzufuegen</button>
+              </div>
+              <div id="ngNeedsList" class="needs"></div>
+            </div>
+
+            <div class="span2">
+              <label>Beschreibung</label>
+              <textarea id="ngDesc" rows="5" placeholder="Kurz beschreiben, was euch ausmacht..."></textarea>
+            </div>
+          </div>
+
+          <button id="createGuild">Eintragen</button>
+          <div id="guildCreated" class="notice"></div>
+        </div>
+      </section>
+
+      <section id="newPlayer" class="panel">
+        <h2>Spielerprofil anlegen</h2>
+        <div class="card">
+          <div class="grid2">
+            <input id="npName" placeholder="Charname" />
+            <input id="npRealm" placeholder="Realm" />
+            <select id="npFaction">
+              <option>Horde</option>
+              <option>Alliance</option>
+            </select>
+            <select id="npLang">
+              <option>DE</option>
+              <option>EN</option>
+            </select>
+
+            <select id="npClass"></select>
+            <select id="npSpec"></select>
+            <select id="npRole">
+              <option>DPS</option>
+              <option>Tank</option>
+              <option>Heal</option>
+            </select>
+
+            <select id="npSkill">
+              <option value="1">Skill 1</option>
+              <option value="2">Skill 2</option>
+              <option value="3" selected>Skill 3</option>
+              <option value="4">Skill 4</option>
+              <option value="5">Skill 5</option>
+            </select>
+
+            <div class="span2">
+              <label>Professions (kommagetrennt)</label>
+              <input id="npProf" placeholder="Engineering, Blacksmithing" />
+            </div>
+
+            <div class="span2">
+              <label>Attunements</label>
+              <div class="chips" id="npAttunes"></div>
+            </div>
+
+            <div class="span2">
+              <label>Verfuegbarkeit</label>
+              <div class="chips" id="npDays"></div>
+            </div>
+
+            <div class="span2">
+              <label>Logs Link (optional)</label>
+              <input id="npLogs" placeholder="https://..." />
+            </div>
+
+            <div class="span2">
+              <label>Notiz</label>
+              <textarea id="npNote" rows="5" placeholder="Was sollte die Gilde wissen?"></textarea>
+            </div>
+          </div>
+
+          <button id="createPlayer">Profil speichern</button>
+          <div id="playerCreated" class="notice"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <small>MVP. Wenn du live gehst: Login, Captcha, Moderation nachruesten.</small>
+    </footer>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
