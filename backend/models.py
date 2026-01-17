@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Text, String, Integer, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Text, String, Integer, BigInteger, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.sql import func
@@ -88,3 +88,28 @@ class Application(Base):
 
     guild: Mapped[Guild] = relationship(back_populates="applications")
     player: Mapped[Player] = relationship(back_populates="applications")
+
+class CharacterImport(Base):
+    __tablename__ = "character_imports"
+    __table_args__ = (
+        UniqueConstraint("name", "realm", name="uq_character_import_name_realm"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    guid: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
+
+    name: Mapped[str] = mapped_column(String(64), index=True)
+    realm: Mapped[str] = mapped_column(String(64), index=True)
+
+    level: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    class_file: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    race_file: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    faction: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    guild_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    exported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

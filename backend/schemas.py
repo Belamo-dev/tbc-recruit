@@ -105,3 +105,18 @@ class ApplicationOut(BaseModel):
     message: str
     status: str
     created_at: str
+
+class ImportRequest(BaseModel):
+    exportString: str
+
+
+class ImportSummary(BaseModel):
+    guid: Optional[str] = None
+    name: str
+    realm: str
+    level: Optional[int] = None
+    classFile: Optional[str] = None
+    raceFile: Optional[str] = None
+    faction: Optional[str] = None
+    guildName: Optional[str] = None
+    exportedAt: Optional[str] = None

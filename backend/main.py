@@ -7,13 +7,18 @@ from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import insert
+
+from import_wpe import decode_export_string, summarize_payload
 
 from db import Base, engine, get_db
-from models import Guild, Player, Application
+from models import Guild, Player, Application, CharacterImport
 from schemas import (
     GuildCreate, GuildOut, GuildCreated,
     PlayerCreate, PlayerOut, PlayerCreated,
     ApplicationCreate, ApplicationOut,
+    ImportRequest, ImportSummary,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -25,7 +30,7 @@ origins = [o.strip() for o in cors.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else [],
+    allow_origins=origins if origins else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -421,3 +426,64 @@ def guild_apps(
         for a in rows
     ]
 
+@app.post("/api/import")
+def import_character(req: ImportRequest, db: Session = Depends(get_db)):
+    try:
+        payload = decode_export_string(req.exportString)
+        summary = summarize_payload(payload)
+
+        name = (summary.get("name") or "").strip()
+        realm = (summary.get("realm") or "").strip()
+        if not name or not realm:
+            raise HTTPException(status_code=400, detail="Missing character name or realm")
+
+        validate_realm(realm)
+
+        exported_at = None
+        exported_at_raw = summary.get("exportedAt")
+        if exported_at_raw:
+            try:
+                exported_at = datetime.fromisoformat(exported_at_raw.replace("Z", "+00:00"))
+            except Exception:
+                exported_at = None
+
+        guid = (summary.get("guid") or "").strip() or None
+
+        values = {
+            "guid": guid,
+            "name": name,
+            "realm": realm,
+            "level": summary.get("level"),
+            "class_file": summary.get("classFile"),
+            "race_file": summary.get("raceFile"),
+            "faction": summary.get("faction"),
+            "guild_name": summary.get("guildName"),
+            "exported_at": exported_at,
+            "payload": payload,
+            "updated_at": func.now(),
+        }
+
+        if guid:
+            stmt = insert(CharacterImport).values(**values)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[CharacterImport.guid],
+                set_=values,
+            ).returning(CharacterImport.id)
+        else:
+            stmt = insert(CharacterImport).values(**values)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[CharacterImport.name, CharacterImport.realm],
+                set_=values,
+            ).returning(CharacterImport.id)
+
+        new_id = db.execute(stmt).scalar()
+        db.commit()
+
+        return {"ok": True, "id": int(new_id) if new_id is not None else None, "summary": ImportSummary(**summary)}
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
