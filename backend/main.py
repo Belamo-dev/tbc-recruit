@@ -1,7 +1,7 @@
 import os
 import secrets
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Set
 
 from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +20,6 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="TBC Recruit API")
 
-# CORS
 cors = os.getenv("CORS_ORIGINS", "")
 origins = [o.strip() for o in cors.split(",") if o.strip()]
 
@@ -32,7 +31,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mini Rate Limit (MVP)
+# Allowed realms
+allowed_realms_env = os.getenv("ALLOWED_REALMS", "Spineshatter,Thunderstrike")
+ALLOWED_REALMS: Set[str] = {r.strip() for r in allowed_realms_env.split(",") if r.strip()}
+
+def validate_realm(realm: str):
+    if realm not in ALLOWED_REALMS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Realm not allowed. Allowed: {', '.join(sorted(ALLOWED_REALMS))}"
+        )
+
+# Mini rate limit
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "30"))
 _rl_bucket: Dict[str, List[datetime]] = {}
 
@@ -93,16 +103,19 @@ def player_to_out(p: Player) -> PlayerOut:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "allowed_realms": sorted(ALLOWED_REALMS)}
 
 # Guilds
 @app.post("/api/guilds", response_model=GuildCreated)
 def create_guild(payload: GuildCreate, db: Session = Depends(get_db)):
+    realm = payload.realm.strip()
+    validate_realm(realm)
+
     token = secrets.token_urlsafe(24)
     g = Guild(
         edit_token=token,
         name=payload.name.strip(),
-        realm=payload.realm.strip(),
+        realm=realm,
         faction=payload.faction,
         language=payload.language.strip(),
         raid_days=payload.raid_days,
@@ -136,8 +149,14 @@ def list_guilds(
     need_role: Optional[str] = None,
 ):
     stmt = select(Guild)
+
     if realm:
+        realm = realm.strip()
+        validate_realm(realm)
         stmt = stmt.where(Guild.realm == realm)
+    else:
+        stmt = stmt.where(Guild.realm.in_(sorted(ALLOWED_REALMS)))
+
     if faction:
         stmt = stmt.where(Guild.faction == faction)
     if language:
@@ -162,7 +181,7 @@ def list_guilds(
 @app.get("/api/guilds/{guild_id}", response_model=GuildOut)
 def get_guild(guild_id: int, db: Session = Depends(get_db)):
     g = db.get(Guild, guild_id)
-    if not g:
+    if not g or g.realm not in ALLOWED_REALMS:
         raise HTTPException(404, "Guild not found")
     return guild_to_out(g)
 
@@ -178,8 +197,11 @@ def update_guild(
         raise HTTPException(404, "Guild not found")
     require_token(g.edit_token, x_edit_token)
 
+    realm = payload.realm.strip()
+    validate_realm(realm)
+
     g.name = payload.name.strip()
-    g.realm = payload.realm.strip()
+    g.realm = realm
     g.faction = payload.faction
     g.language = payload.language.strip()
     g.raid_days = payload.raid_days
@@ -214,11 +236,14 @@ def delete_guild(
 # Players
 @app.post("/api/players", response_model=PlayerCreated)
 def create_player(payload: PlayerCreate, db: Session = Depends(get_db)):
+    realm = payload.realm.strip()
+    validate_realm(realm)
+
     token = secrets.token_urlsafe(24)
     p = Player(
         edit_token=token,
         name=payload.name.strip(),
-        realm=payload.realm.strip(),
+        realm=realm,
         faction=payload.faction,
         language=payload.language.strip(),
         class_name=payload.class_name.strip(),
@@ -253,8 +278,14 @@ def list_players(
     q: Optional[str] = None,
 ):
     stmt = select(Player)
+
     if realm:
+        realm = realm.strip()
+        validate_realm(realm)
         stmt = stmt.where(Player.realm == realm)
+    else:
+        stmt = stmt.where(Player.realm.in_(sorted(ALLOWED_REALMS)))
+
     if faction:
         stmt = stmt.where(Player.faction == faction)
     if language:
@@ -277,7 +308,7 @@ def list_players(
 @app.get("/api/players/{player_id}", response_model=PlayerOut)
 def get_player(player_id: int, db: Session = Depends(get_db)):
     p = db.get(Player, player_id)
-    if not p:
+    if not p or p.realm not in ALLOWED_REALMS:
         raise HTTPException(404, "Player not found")
     return player_to_out(p)
 
@@ -293,8 +324,11 @@ def update_player(
         raise HTTPException(404, "Player not found")
     require_token(p.edit_token, x_edit_token)
 
+    realm = payload.realm.strip()
+    validate_realm(realm)
+
     p.name = payload.name.strip()
-    p.realm = payload.realm.strip()
+    p.realm = realm
     p.faction = payload.faction
     p.language = payload.language.strip()
     p.class_name = payload.class_name.strip()
@@ -333,6 +367,9 @@ def apply(payload: ApplicationCreate, db: Session = Depends(get_db)):
     if not g or not p:
         raise HTTPException(404, "Guild or Player not found")
 
+    if g.realm not in ALLOWED_REALMS or p.realm not in ALLOWED_REALMS:
+        raise HTTPException(400, "Realm not allowed")
+
     a = Application(
         guild_id=g.id,
         player_id=p.id,
@@ -367,6 +404,9 @@ def guild_apps(
         raise HTTPException(404, "Guild not found")
     require_token(g.edit_token, x_edit_token)
 
+    if g.realm not in ALLOWED_REALMS:
+        raise HTTPException(404, "Guild not found")
+
     stmt = select(Application).where(Application.guild_id == guild_id)
     rows = db.execute(stmt).scalars().all()
     return [
@@ -380,3 +420,4 @@ def guild_apps(
         )
         for a in rows
     ]
+

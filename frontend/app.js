@@ -247,7 +247,7 @@ function setupUI() {
 function setupActions() {
   qs("loadGuilds").addEventListener("click", async () => {
     const params = {
-      realm: qs("gRealm").value.trim(),
+      realm: qs("gRealm").value,
       faction: qs("gFaction").value,
       language: qs("gLang").value,
       q: qs("gQuery").value.trim(),
@@ -267,7 +267,7 @@ function setupActions() {
 
   qs("loadPlayers").addEventListener("click", async () => {
     const params = {
-      realm: qs("pRealm").value.trim(),
+      realm: qs("pRealm").value,
       faction: qs("pFaction").value,
       language: qs("pLang").value,
       q: qs("pQuery").value.trim(),
@@ -326,7 +326,7 @@ function setupActions() {
   qs("createGuild").addEventListener("click", async () => {
     const body = {
       name: qs("ngName").value.trim(),
-      realm: qs("ngRealm").value.trim(),
+      realm: qs("ngRealm").value,
       faction: qs("ngFaction").value,
       language: qs("ngLang").value,
       raid_days: getChipsOn(qs("ngDays")),
@@ -361,7 +361,7 @@ function setupActions() {
 
     const body = {
       name: qs("npName").value.trim(),
-      realm: qs("npRealm").value.trim(),
+      realm: qs("npRealm").value,
       faction: qs("npFaction").value,
       language: qs("npLang").value,
       class_name: qs("npClass").value,
